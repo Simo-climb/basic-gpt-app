@@ -1,31 +1,38 @@
-import streamlit as st
 import openai
-import time
+import streamlit as st
 
-# Set up the OpenAI API key
-openai.api_key = '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'
+st.title("ChatGPT-like clone")
 
-TOKEN_LIMIT = 500  # Set a token limit for each request
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-def get_gpt_response(prompt, max_tokens=TOKEN_LIMIT):
-    """Get response from GPT-3 based on the given prompt."""
-    retries = 3  # Number of retries
-    wait_time = 10  # Wait time in seconds before retrying
-    
-    for _ in range(retries):
-        try:
-            response = openai.Completion.create(engine="davinci", prompt=prompt, max_tokens=max_tokens)
-            return response.choices[0].text.strip()
-        except openai.error.RateLimitError:
-            st.warning("Rate limit exceeded. Waiting for a few seconds before retrying...")
-            time.sleep(wait_time)
-    return "Error: Unable to get a response after multiple retries."
+if "openai_model" not in st.session_state:
+    st.session_state["openai_model"] = "gpt-3.5-turbo"
 
-# Streamlit UI
-st.title("ChatGPT Streamlit App with Token Rate Limiting")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-user_input = st.text_input("Enter your prompt for ChatGPT:")
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-if user_input:
-    response = get_gpt_response(user_input)
-    st.write(response)
+if prompt := st.chat_input("What is up?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        
+        # Using openai.ChatCompletion for GPT chat
+        response = openai.ChatCompletion.create(
+            model=st.session_state["openai_model"],
+            messages=[
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+            ]
+        )
+        full_response = response.choices[0].message['content']
+        message_placeholder.markdown(full_response)
+        
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
